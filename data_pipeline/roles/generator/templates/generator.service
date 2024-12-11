@@ -1,0 +1,11 @@
+[Unit]
+Description=Data Creator Service
+After=multi-user.target
+
+[Service]
+User=root
+Restart=on-failure
+ExecStart=/usr/bin/python3 /home/ec2-user/data_pipeline/roles/generator/package/data_creator.py --threads 4
+
+[Install]
+WantedBy=multi-user.target

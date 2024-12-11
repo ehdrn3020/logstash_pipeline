@@ -1,0 +1,109 @@
+---
+- name: Install and Configure Logstash Manually
+  hosts: all
+  become: true
+  tasks:
+    # wget 패키지 설치
+    - name: Install wget
+      yum:
+        name: wget
+        state: present
+
+    # Amazon Linux Extras에서 Java 11 활성화
+    - name: Enable Amazon Linux Extras for Java 11
+      command: amazon-linux-extras enable java-openjdk11
+
+    # 패키지 캐시 업데이트
+    - name: Update package cache
+      yum:
+        name: "*"
+        state: latest
+        update_cache: true
+
+    # Java 11 설치
+    - name: Install Java 11 (required for Logstash)
+      yum:
+        name: java-11-openjdk
+        state: present
+
+    # package directory 생성
+    - name: Create destination directory for Logstash
+      file:
+        path: /home/ec2-user/packages
+        state: directory
+        mode: '0755'
+
+    # Logstash 다운로드
+    - name: Download Logstash
+      get_url:
+        url: https://artifacts.elastic.co/downloads/logstash/logstash-8.16.0-darwin-aarch64.tar.gz
+        dest: /home/ec2-user/packages/logstash-8.16.0-darwin-aarch64.tar.gz
+
+    # 압축 풀기
+    - name: Extract Logstash
+      ansible.builtin.command:
+        cmd: tar xfz logstash-8.16.0-darwin-aarch64.tar.gz
+        chdir: /home/ec2-user/packages
+      args:
+        creates: /home/ec2-user/packages/logstash-8.16.0
+
+    # Logstash 디렉토리 권한 설정
+    - name: Set permissions for Logstash
+      file:
+        path: /home/ec2-user/packages/logstash-8.16.0
+        owner: root
+        group: root
+        mode: '0755'
+        state: directory
+
+    # Logstash JDBC 플러그인 설치
+    - name: Install Logstash JDBC Output Plugin
+      command: /home/ec2-user/packages/logstash-8.16.0/bin/logstash-plugin install logstash-output-jdbc
+      args:
+        creates: /home/ec2-user/packages/logstash-8.16.0/vendor/bundle/jruby/3.1.0/gems/logstash-output-jdbc
+
+    # MySQL JDBC 드라이버 다운로드
+    - name: Download MySQL JDBC Driver
+      command:
+        cmd: wget https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar -P /home/ec2-user/packages/logstash-8.16.0/vendor/jar/
+      args:
+        creates: /home/ec2-user/packages/logstash-8.16.0/vendor/jar/mysql-connector-j-8.0.33.jar
+
+    # 실행 쉘파일 권한 변경
+    - name: Set permissions to 744 for a specific file
+      ansible.builtin.file:
+        path: /home/ec2-user/data_pipeline/roles/collector/templates/run_logstash.sh
+        mode: '0744'
+        state: file
+
+    # Logstash 설정 파일 복사
+    - name: Copy collector.conf to Logstash config directory
+      template:
+        src: "../templates/collector.conf"
+        dest: "/home/ec2-user/packages/logstash-8.16.0/config/collector.conf"
+        owner: root
+        group: root
+        mode: '0644'
+
+    # Systemd에 collector(Logstash) 서비스 등록
+    - name: register systemd generator
+      template:
+        src: "../templates/collector.service"
+        dest: "/etc/systemd/system/collector.service"
+        owner: root
+        group: root
+        mode: '0644'
+        backup: no
+
+    # Systemd 서비스 재로드
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    # Logstash 서비스 활성화 및 시작
+    - name: Enable and restarted Logstash service
+      systemd:
+        name: collector
+        state: restarted
+        daemon_reload: true
+

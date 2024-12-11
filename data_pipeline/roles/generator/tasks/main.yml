@@ -1,0 +1,40 @@
+---
+- name: Install Generator on Amazon Linux 2
+  hosts: all
+  become: true
+  tasks:
+    # 패키지 캐시 업데이트
+    - name: Update package cache
+      yum:
+        name: "*"
+        state: latest
+        update_cache: true
+
+    # Logs diectory 생성
+    - name: Create destination directory for Generator
+      file:
+        path: /home/ec2-user/logs
+        state: directory
+        mode: '0755'
+
+    # Systemd에 generator 서비스 등록
+    - name: register systemd generator
+      template:
+        src: "../templates/generator.service"
+        dest: "/etc/systemd/system/generator.service"
+        owner: root
+        group: root
+        mode: '0644'
+        backup: no
+
+    # Systemd 재로드하여 서비스 파일 적용
+    - name: just force systemd to reload configs
+      systemd:
+        daemon_reload: yes
+
+    # generator 서비스를 시작
+    - name: make sure a generator service is running
+      systemd:
+        state: restarted
+        name: generator
+        daemon_reload: true

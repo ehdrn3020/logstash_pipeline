@@ -1,0 +1,55 @@
+---
+- name: Deploy FastAPI Application
+  hosts: all
+  become: true
+
+  tasks:
+    # Install Python and pip
+    - name: Install Python and pip
+      yum:
+        name:
+          - python3-pip
+        state: present
+
+    # Install FastAPI and Uvicorn
+    - name: Install FastAPI and Uvicorn
+      pip:
+        executable: /usr/bin/pip3
+        name:
+          - fastapi
+          - uvicorn
+          - aiomysql
+
+    # create apps directory
+    - name: Create destination directory for FastAPI
+      file:
+        path: /home/ec2-user/apps
+        state: directory
+        mode: '0755'
+
+    # Copy FastAPI application code
+    - name: Deploy FastAPI Application
+      copy:
+        src: ../package/fastapi_app.py
+        dest: /home/ec2-user/apps/fastapi_app.py
+        owner: root
+        group: root
+        mode: '0755'
+
+    # Systemd에 serving(FastAPI) 서비스 등록
+    - name: register systemd generator
+      template:
+        src: "../templates/fastapi.service"
+        dest: "/etc/systemd/system/fastapi.service"
+        owner: root
+        group: root
+        mode: '0644'
+        backup: no
+
+    # Reload Systemd and start FastAPI
+    - name: Enable and restart FastAPI service
+      systemd:
+        name: fastapi
+        enabled: true
+        state: restarted
+        daemon_reload: true

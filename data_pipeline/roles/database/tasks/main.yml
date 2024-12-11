@@ -1,0 +1,82 @@
+---
+- name: Install and Configure MariaDB on Amazon Linux 2
+  hosts: all
+  become: true
+  vars:
+    db_user: dgk
+    db_pwd: 1234
+    db_name: data
+  tasks:
+    # Enable MariaDB 10.5 via Amazon Linux Extras
+    - name: Enable MariaDB 10.5 via Amazon Linux Extras
+      command: amazon-linux-extras enable mariadb10.5
+      tags:
+        - mariadb_install
+
+    # Install MariaDB server
+    - name: Install MariaDB server
+      yum:
+        name: mariadb-server
+        state: present
+      tags:
+        - mariadb_install
+
+    # Ensure MariaDB service is running
+    - name: Ensure MariaDB service is running
+      systemd:
+        name: mariadb
+        state: restarted
+        enabled: yes
+      tags:
+        - mariadb_service
+
+    # Set root password for MariaDB
+    - name: Set MySQL root password
+      command: >
+        mysqladmin -u root password "{{ db_pwd }}"
+      args:
+        creates: /root/.mysql_password_set
+      tags:
+        - mariadb_security
+
+    # Create database using MySQL CLI
+    - name: Create database `data`
+      shell: >
+        mysql -u root -p'{{ db_pwd }}' -e "CREATE DATABASE IF NOT EXISTS {{ db_name }};"
+      tags:
+        - mariadb_db
+
+    # Create MySQL user and grant privileges
+    - name: Create MariaDB user and grant privileges
+      shell: |
+        mysql -u root -p'{{ db_pwd }}' -e "
+        CREATE USER IF NOT EXISTS '{{ db_user }}'@'%' IDENTIFIED BY '{{ db_pwd }}';
+        GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'%';
+        FLUSH PRIVILEGES;"
+      tags:
+        - mariadb_user
+
+    # sql directory 생성
+    - name: Create destination directory for SQL
+      file:
+        path: /home/ec2-user/sql
+        state: directory
+        mode: '0755'
+
+    # Copy SQL file to target
+    - name: Copy SQL file to target
+      template:
+        src: "../templates/create.sql"
+        dest: /home/ec2-user/sql/create_table.sql
+        owner: root
+        group: root
+        mode: '0644'
+      tags:
+        - mariadb_sql
+
+    # Import SQL file to create table
+    - name: Import SQL file to create table
+      shell: |
+        mysql -u root -p'{{ db_pwd }}' {{ db_name }} < /home/ec2-user/sql/create_table.sql
+      tags:
+        - mariadb_table

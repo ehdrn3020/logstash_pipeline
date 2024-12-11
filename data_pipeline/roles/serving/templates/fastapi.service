@@ -1,0 +1,11 @@
+Description=FastAPI Application
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/home/ec2-user
+ExecStart=/usr/bin/python3 -m uvicorn data_pipeline.roles.serving.package.fastapi_app:app --host 0.0.0.0 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
