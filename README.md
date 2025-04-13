@@ -1,5 +1,8 @@
 # logstash_pipeline
 logstash를 통해 데이터 수집 후 API 제공
+- fastAPI / RestAPI
+- Logstash
+- Mysql
 
 ## 프로세스
 <img src="./process.png" width="600">
